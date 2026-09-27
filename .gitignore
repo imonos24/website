@@ -1,0 +1,40 @@
+# Environment & Secrets (NEVER COMMIT THESE)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node & Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.cache/
+
+# Python & Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.tsbuildinfo
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
