@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from .config import RISK_THRESHOLDS
 from .database import DatabaseError, database
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "geojson"
 MODELS = {
     "NCEP GFS": ("https://api.open-meteo.com/v1/forecast", "ncep_gfs_global"),
