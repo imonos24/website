@@ -3,3 +3,56 @@
 @media(max-width:760px){.top{height:66px;padding:0 13px;gap:10px}.brand b{font-size:11px}.brand small{font-size:9px}.topmeta{display:none}.frame{min-height:calc(100vh - 66px)}.side{width:58px;flex-basis:58px;padding:18px 7px}.side .sidecap,.side .navitem span,.side .source-tag span{display:none}.side .navitem{justify-content:center;padding:0}.side .source-tag{justify-content:center}.side:not(.collapsed){position:fixed;z-index:1050;top:66px;bottom:0;width:226px;box-shadow:8px 0 20px #18374a22}.side:not(.collapsed) .sidecap,.side:not(.collapsed) .navitem span,.side:not(.collapsed) .source-tag span{display:initial}.side:not(.collapsed) .source-tag{justify-content:flex-start}.main{padding:20px 13px}.pagehead{align-items:flex-start}.pagehead h1{font-size:21px}.stamp{display:none}.controls{flex-wrap:wrap}.controls label{min-width:calc(50% - 6px)}.controls .primary{flex:1}.summary{gap:8px}.metric{padding:13px 11px}.metric>strong{font-size:21px}.metric-top{font-size:10px}.metric-top svg{width:15px}.metric-sub{font-size:9px}.riskbanner{align-items:flex-start}.riskbanner small{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.riskgrid{grid-template-columns:1fr}.mapbox{min-height:430px}.legend{right:7px;top:7px;max-width:155px;padding:9px;font-size:8px}.mapnotice{width:90%;text-align:center;line-height:1.5}.section{padding:15px 12px}.secthead{align-items:flex-start}.badge{font-size:8px}}
 .mini-map{height:255px;min-height:255px;margin:14px 0}.mini-label{position:absolute;left:12px;bottom:12px;z-index:500;background:#fff;border:1px solid #e0e8eb;border-radius:6px;padding:8px 10px;color:#35596c;font-size:10px;font-weight:600;box-shadow:0 2px 8px #203d4c1a}
 .wind-arrow{background:transparent;border:0}.wind-arrow span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;color:#075f87;border:1px solid #3689a7;font-size:19px;font-weight:700;box-shadow:0 1px 5px #102f3e55;transform-origin:center}
+
+/* Synthetic model-comparison and historical-analysis pages. */
+.side{background:#091b2e;border-right-color:#142c42}
+.sidecap{color:#7791a7}
+.navitem{color:#8ea9be;border-radius:0;margin:2px -13px;padding-left:26px;border-left:3px solid transparent}
+.navitem:hover{background:#102b47;color:#e8f3fb}
+.navitem.active{color:#fff;background:#12375b;border-left-color:#d39a19}
+.sidebottom{border-top-color:#193149}
+.source-tag{color:#9bb4c8}
+.source-tag small{color:#718ba0}
+.mock-controls{align-items:flex-end;gap:12px;padding:17px 20px}
+.mock-controls label{min-width:155px;max-width:240px;gap:7px;color:#8496a1;font-size:11px;font-weight:500}
+.mock-controls select{height:39px;font-size:12px;color:#304858;background:#fbfcfd;border-color:#dce4e9}
+.mock-selection-note{display:flex;align-items:center;gap:10px;color:#82929b;font-size:11px;margin:-5px 2px 13px}
+.mock-selection-note span{color:#435a68;font-weight:600}
+.mock-selection-note i{width:3px;height:3px;border-radius:50%;background:#b3c0c7}
+.mock-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:0 0 18px}
+.mock-model-card{padding:16px 17px 15px;border-top:2px solid var(--model-color);min-width:0}
+.mock-model-heading{display:flex;align-items:center;gap:8px;min-height:23px;color:#304657;font-size:12px}
+.mock-model-heading>i,.mock-table-model>i{width:9px;height:9px;background:var(--model-color);border-radius:2px;flex:0 0 9px}
+.best-mae{margin-left:auto;padding:3px 7px;background:#edf4fb;color:#35658f;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap}
+.mock-card-values{display:grid;grid-template-columns:1fr 1fr;gap:14px 10px;margin-top:15px}
+.mock-card-values>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.mock-card-values span{color:#8999a2;font-size:10px}
+.mock-card-values b{font:600 16px 'DM Sans',sans-serif;color:#172d3f;white-space:nowrap}
+.mock-card-values small{font:400 10px 'DM Sans',sans-serif;color:#82919a}
+.mock-chart-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:15px;margin-bottom:15px;align-items:stretch}
+.mock-chart-card{padding:18px 20px;min-width:0;overflow:hidden}
+.mock-chart-title{margin-bottom:12px}
+.mock-chart-title h2{font:700 14px Manrope,sans-serif;color:#213e52;margin:0 0 5px}
+.mock-chart-title p{font-size:11px;color:#8999a2;margin:0;line-height:1.45}
+.mock-chart-card .recharts-wrapper{font-family:'DM Sans',sans-serif}
+.mock-table-card{padding:18px 20px;margin:0}
+.mock-table-card .mock-chart-title{margin-bottom:8px}
+.mock-table{min-width:730px}
+.mock-table th{font-size:10px;font-weight:500;letter-spacing:0;padding:11px 9px;color:#8796a0}
+.mock-table td{padding:11px 9px;font-size:12px;color:#203748}
+.mock-table td:not(:first-child){font-variant-numeric:tabular-nums}
+.mock-table-model{display:flex;align-items:center;gap:8px;white-space:nowrap;font-weight:500;color:#304858}
+.mock-footnote,.mock-reference-note{color:#8998a1;font-size:10px;line-height:1.55;margin:12px 0 0}
+.mock-reference-note{text-align:center;margin:14px 0 4px}
+.mock-empty{min-height:215px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;padding:22px;text-align:center;color:#8998a1;font-size:11px}
+.mock-empty svg{color:#9aabb4}
+.mock-empty b{font-size:12px;color:#536c7b}
+.mock-empty span{max-width:430px;line-height:1.5}
+.mock-history-main{margin-bottom:15px}
+.mock-lower-grid{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:15px;align-items:stretch}
+.mock-lower-card{margin:0}
+.mock-skill-table{min-width:390px}
+.mock-skill-table td,.mock-skill-table th{padding:13px 8px}
+.mock-history-main .recharts-wrapper{margin:0 auto}
+@media(max-width:1100px){.mock-controls{flex-wrap:wrap}.mock-controls label{flex:1 1 160px;max-width:none}.mock-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.mock-chart-grid{grid-template-columns:1fr}.mock-lower-grid{grid-template-columns:1fr}}
+@media(max-width:760px){.mock-controls{gap:10px;padding:13px}.mock-controls label{min-width:calc(50% - 8px);max-width:none}.mock-selection-note{flex-wrap:wrap;font-size:10px}.mock-kpis{gap:9px}.mock-model-card{padding:13px 12px}.mock-model-heading{font-size:11px;flex-wrap:wrap}.mock-card-values{gap:12px 6px}.mock-card-values b{font-size:14px}.mock-chart-card{padding:15px 11px}.mock-table-card{padding:15px 11px}.mock-lower-grid{grid-template-columns:1fr}}

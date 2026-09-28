@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import time
 import json
 import logging
@@ -66,6 +67,7 @@ class Location(BaseModel):
 class ForecastRequest(BaseModel):
     location_id: str
     lead_hours: Literal[24, 48, 72] = 24
+    weights: dict[str, float] | None = None
 
 
 class ForecastSource(BaseModel):
@@ -174,7 +176,49 @@ def all_locations() -> list[Location]:
 
 LOCATIONS = all_locations()
 LOCATION_MAP = {x.id: x for x in LOCATIONS}
-FORECAST_CACHE: dict[tuple[str, int], tuple[float, dict]] = {}
+FORECAST_CACHE: dict[tuple[str, int, tuple[tuple[str, float], ...]], tuple[float, dict]] = {}
+
+
+def selectable_locations() -> tuple[list[Location], set[str]]:
+    """Filter the existing GeoJSON location catalog using the approved city list.
+
+    IDs and coordinates stay sourced from LOCATIONS; the CSV only restricts names.
+    """
+    path = ROOT / "data" / "state_city_terrain.csv"
+    if not path.exists():
+        logger.warning("State/city selection CSV is unavailable: %s", path)
+        return [], set()
+
+    # The CSV uses Indian state abbreviations; CT and UT are the corresponding
+    # ISO suffixes in the supplied boundary file for CG and UK.
+    code_aliases = {"CG": "CT", "UK": "UT"}
+    state_codes = {
+        str(feature.get("properties", {}).get("ISO_Code", "")).split("-")[-1].upper():
+        feature_id(feature, "ADM1")
+        for feature in read_geo("ADM1")["features"]
+    }
+    allowed_names: set[tuple[str, str]] = set()
+    allowed_states: set[str] = set()
+    with path.open(encoding="utf-8-sig", newline="") as source:
+        for row in csv.DictReader(source):
+            code = str(row.get("State", "")).strip().upper()
+            city = str(row.get("City", "")).strip()
+            state_id = state_codes.get(code_aliases.get(code, code))
+            if state_id:
+                allowed_states.add(state_id)
+                if city:
+                    allowed_names.add((state_id, city.casefold()))
+
+    locations = [
+        location for location in LOCATIONS
+        if location.level == "district"
+        and location.parent_id is not None
+        and (location.parent_id, location.name.casefold()) in allowed_names
+    ]
+    return locations, allowed_states
+
+
+SELECTABLE_LOCATIONS, CSV_STATE_IDS = selectable_locations()
 
 
 @app.get("/api/health")
@@ -200,24 +244,24 @@ async def states(region_id: str = "india"):
         try:
             rows = await database.get_locations(level="state")
             if rows:
-                return [Location(id=x["id"], name=x["name"], level=x["level"], parent_id=x.get("parent_id"), latitude=x.get("lat"), longitude=x.get("lon")) for x in rows]
+                return [Location(id=x["id"], name=x["name"], level=x["level"], parent_id=x.get("parent_id"), latitude=x.get("lat"), longitude=x.get("lon")) for x in rows if x["id"] in CSV_STATE_IDS]
         except DatabaseError:
             logger.warning("Falling back to bundled state boundaries because Supabase is unavailable")
-    return [x for x in LOCATIONS if x.level == "state"]
+    return [x for x in LOCATIONS if x.level == "state" and x.id in CSV_STATE_IDS]
 
 
 @app.get("/api/locations/districts", response_model=list[Location])
 async def districts(state_id: str | None = None):
-    # This source's ADM2 file has no dependable parent-state key. Return the list and expose that limitation.
+    allowed = [x for x in SELECTABLE_LOCATIONS if not state_id or x.parent_id == state_id]
+    allowed_ids = {x.id for x in allowed}
     if database.configured:
         try:
             rows = await database.get_locations(level="district", parent_id=state_id)
             if rows:
-                return [Location(id=x["id"], name=x["name"], level=x["level"], parent_id=x.get("parent_id"), latitude=x.get("lat"), longitude=x.get("lon")) for x in rows]
+                return [Location(id=x["id"], name=x["name"], level=x["level"], parent_id=x.get("parent_id"), latitude=x.get("lat"), longitude=x.get("lon")) for x in rows if x["id"] in allowed_ids]
         except DatabaseError:
             logger.warning("Falling back to bundled district boundaries because Supabase is unavailable")
-    rows = [x for x in LOCATIONS if x.level == "district"]
-    return [x for x in rows if x.parent_id == state_id] if state_id else rows
+    return allowed
 
 
 async def fetch_model(client: httpx.AsyncClient, name: str, location: Location, hours: int) -> dict:
@@ -243,7 +287,9 @@ async def fetch_model(client: httpx.AsyncClient, name: str, location: Location, 
         return {"model": name, "status": "unavailable", "rainfall_mm": None, "temperature_c": None, "wind_speed_kmh": None, "wind_direction_deg": None, "error": str(e)[:240]}
 
 
-def weights_for(sources: list[dict]) -> tuple[dict, str]:
+def weights_for(sources: list[dict], comparison_weights: dict[str, float] | None = None) -> tuple[dict, str]:
+    if comparison_weights:
+        return dict(comparison_weights), "model_comparison_weights"
     # No verified history has been configured; equal weights are explicitly labelled a demo fallback.
     available = [s["model"] for s in sources if s["status"] == "available"]
     if not available: return {}, "unavailable"
@@ -280,16 +326,18 @@ def make_risks(values: dict, location: Location):
     return [{"type": kind, "level": risk(v, metric), "message": labels[risk(v, metric)], "value": v, "unit": unit, "location": location.name, "prototype_guidance": True} for kind, metric, v, unit in cases]
 
 
-async def forecast(location: Location, hours: int):
-    key = (location.id, hours); cached = FORECAST_CACHE.get(key)
+async def forecast(location: Location, hours: int, comparison_weights: dict[str, float] | None = None):
+    weight_key = tuple(sorted((comparison_weights or {}).items()))
+    key = (location.id, hours, weight_key); cached = FORECAST_CACHE.get(key)
     if cached and cached[0] > time.monotonic(): return cached[1]
     async with httpx.AsyncClient() as client:
         sources = await asyncio.gather(*(fetch_model(client, name, location, hours) for name in MODELS))
-    weights, method = weights_for(sources); values = blend(sources, weights)
+    weights, method = weights_for(sources, comparison_weights); values = blend(sources, weights)
     result = {"location": location, "lead_hours": hours, "fetched_at": datetime.now(timezone.utc).isoformat(), "sources": sources,
             "weights": weights, "weight_method": method, "verification_reference": "none_configured", "blended": values,
             "risks": make_risks(values, location), "partial": any(s["status"] != "available" for s in sources),
-            "explanation": "Equal weights are a transparent fallback because this MVP has no stored verification history. No live provider value is replaced with a synthetic forecast."}
+            "explanation": "Using the current Model Comparison weights. Forecast values are still retrieved from live providers." if comparison_weights else
+            "Equal weights are a transparent fallback because this MVP has no stored verification history. No live provider value is replaced with a synthetic forecast."}
     if database.configured:
         try:
             await database.save_forecast(result)
@@ -304,15 +352,21 @@ async def forecast(location: Location, hours: int):
 async def forecast_endpoint(request: ForecastRequest):
     location = LOCATION_MAP.get(request.location_id)
     if not location: raise HTTPException(404, "Unknown location_id")
-    return await forecast(location, request.lead_hours)
+    if request.weights is not None:
+        if set(request.weights) - set(MODELS):
+            raise HTTPException(422, "Weights contain an unknown forecast model")
+        total_weight = sum(request.weights.values())
+        if any(not math.isfinite(weight) or weight < 0 for weight in request.weights.values()) or not math.isfinite(total_weight) or total_weight <= 0:
+            raise HTTPException(422, "Weights must be finite, non-negative, and include a positive value")
+    return await forecast(location, request.lead_hours, request.weights)
 
 
 @app.post("/api/map/state/{state_id}")
 async def state_forecasts(state_id: str, lead_hours: int = Query(24, ge=24, le=72, multiple_of=24)):
     state = LOCATION_MAP.get(state_id)
     if not state or state.level != "state": raise HTTPException(404, "Unknown state_id")
-    selected = [x for x in LOCATIONS if x.level == "district" and x.parent_id == state_id]
-    if not selected: return {"state": state, "districts": [], "partial": True, "message": "The boundary metadata did not reliably associate districts with this state."}
+    selected = [x for x in SELECTABLE_LOCATIONS if x.parent_id == state_id]
+    if not selected: return {"state": state, "districts": [], "partial": True, "message": "No listed city matches an existing district boundary for this state."}
     semaphore = asyncio.Semaphore(4)
     async def bounded(location):
         async with semaphore: return await forecast(location, lead_hours)
@@ -372,7 +426,10 @@ async def extreme_weather(location_id: str, lead_hours: int = Query(24, ge=24, l
 @app.get("/api/map/boundaries/{level}")
 async def boundaries(level: Literal["states", "districts"], state_id: str | None = None):
     geo = read_geo("ADM1" if level == "states" else "ADM2")
-    if level == "districts" and state_id:
-        allowed = {x.id.split(":", 1)[1] for x in LOCATIONS if x.level == "district" and x.parent_id == state_id}
+    if level == "states":
+        allowed = {x.id.split(":", 1)[1] for x in LOCATIONS if x.level == "state" and x.id in CSV_STATE_IDS}
+        geo = {**geo, "features": [f for f in geo["features"] if f.get("properties", {}).get("gbid") in allowed]}
+    if level == "districts":
+        allowed = {x.id.split(":", 1)[1] for x in SELECTABLE_LOCATIONS if not state_id or x.parent_id == state_id}
         geo = {**geo, "features": [f for f in geo["features"] if f.get("properties", {}).get("gbid") in allowed]}
     return geo
