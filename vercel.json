@@ -4,8 +4,11 @@
     "backend": {
       "root": "./",
       "framework": "fastapi",
-      "entrypoint": "backend/app/main.py"
-    },
+      "entrypoint": "backend/app/main.py",
+      "includeFiles": [
+        "data/**"
+  ]
+},
     "frontend": {
       "root": "frontend/",
       "framework": "vite",
