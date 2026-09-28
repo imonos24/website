@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useState}from'react';import{createRoot}from'react-dom/client';import{BrowserRouter,NavLink,Route,Routes,useLocation}from'react-router-dom';import{MapContainer,TileLayer,GeoJSON,Marker,useMap}from'react-leaflet';import L from'leaflet';import{Activity,History,AlertTriangle,Menu,RefreshCw,CloudSun,Database,LayoutDashboard,CloudRain,Wind,Sun,Map as MapIcon}from'lucide-react';import{DatabaseComparison,DatabaseHistory}from'./data-pages';import'leaflet/dist/leaflet.css';import'./style.css';
 
 import{COMPARISON_WEIGHT_STORAGE_KEY,defaultComparisonWeightSnapshot,loadMockWeatherData,type ComparisonWeightSnapshot}from'./mock-weather-data';
-const API=import.meta.env.VITE_API_URL||'http://localhost:8000/api';
+const API=import.meta.env.VITE_API_URL||'/api';
 type LocationT={id:string;name:string;level:'state'|'district';parent_id?:string|null;latitude?:number|null;longitude?:number|null};
 type FC={location:LocationT;lead_hours:number;fetched_at:string;partial:boolean;sources:any[];weights:Record<string,number>;weight_method:string;blended:Record<string,number|null>;risks:any[];explanation:string};
 async function get<T>(p:string,init?:RequestInit):Promise<T>{const r=await fetch(API+p,init);if(!r.ok)throw new Error(`API ${r.status}: ${await r.text()}`);return r.json()}
