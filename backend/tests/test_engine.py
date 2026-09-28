@@ -17,6 +17,21 @@ class BlendTests(unittest.TestCase):
         self.assertAlmostEqual(sum(weights.values()), 1.0)
         self.assertNotIn("B", weights)
 
+    def test_comparison_weights_override_the_equal_fallback(self):
+        comparison_weights = {"A": 0.194478, "B": 0.224242, "C": 0.356236, "D": 0.225044}
+        weights, method = weights_for(
+            [{"model": "A", "status": "available"}, {"model": "B", "status": "unavailable"}],
+            comparison_weights,
+        )
+        self.assertEqual(method, "model_comparison_weights")
+        self.assertEqual(weights, comparison_weights)
+        self.assertAlmostEqual(sum(weights.values()), 1.0)
+        values = blend([
+            {"model": "A", "status": "available", "rainfall_mm": 10, "temperature_c": None, "wind_speed_kmh": None},
+            {"model": "B", "status": "available", "rainfall_mm": 20, "temperature_c": None, "wind_speed_kmh": None},
+        ], {"A": 0.2, "B": 0.8})
+        self.assertEqual(values["rainfall_mm"], 18)
+
     def test_wind_direction_uses_circular_mean(self):
         sources = [
             {"model": "A", "status": "available", "wind_direction_deg": 359, "rainfall_mm": None, "temperature_c": None, "wind_speed_kmh": None},
