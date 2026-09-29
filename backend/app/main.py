@@ -379,6 +379,12 @@ async def models():
     return [{"name": k, "provider": "Open-Meteo", "model_id": v[1] or "ECMWF endpoint default (IFS HRES 9 km)"} for k, v in MODELS.items()]
 
 
+@app.get("/api/risk/thresholds")
+async def risk_thresholds():
+    """Return the same prototype thresholds used by forecast risk classification."""
+    return RISK_THRESHOLDS
+
+
 @app.get("/api/model-comparison")
 async def comparison(location_id: str | None = None):
     metrics = []
