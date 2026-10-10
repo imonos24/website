@@ -77,3 +77,4 @@ footer{color:#202a31;font-size:11px;font-weight:700;line-height:1.6;overflow-wra
 @media(max-width:900px){.brandlogo{width:clamp(145px,16vw,170px)}}
 @media(max-width:760px){.brandlogo{width:clamp(130px,32vw,155px)}}
 @media(max-width:430px){.brandlogo{width:clamp(120px,35vw,138px)}}
+.nav-custom-icon{display:inline-block;flex:0 0 auto;background-color:currentColor;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain}.india-icon{-webkit-mask-image:url('/india.svg');mask-image:url('/india.svg')}.benchmark-icon{-webkit-mask-image:url('/benchmark.svg');mask-image:url('/benchmark.svg')}
