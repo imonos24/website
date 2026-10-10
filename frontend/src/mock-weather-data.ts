@@ -82,15 +82,29 @@ export type MockWeatherData = {
 export type ComparisonWeightSnapshot = {
   weights: Record<string, number>;
   context: string;
+  locationId: string;
+  locationName: string;
+  stateCode: string;
+  variable: VariableKey;
+  period: Period;
+  lead: number;
 };
-
-export const COMPARISON_WEIGHT_STORAGE_KEY = 'mausam-mitra-comparison-weight-snapshot';
 
 const FORECAST_MODEL_NAMES: Record<ModelId, string> = {
   'NCEP GFS': 'NCEP GFS',
   IFS: 'ECMWF IFS HRES',
   AIFS: 'ECMWF AIFS',
   'GFS ENSEMBLE': 'GFS Ensemble Mean',
+};
+
+const STATE_CODES: Record<string, string> = {
+  'andhra pradesh': 'AP', 'arunachal pradesh': 'AR', assam: 'AS', bihar: 'BR',
+  chhattisgarh: 'CG', delhi: 'DL', goa: 'GA', gujarat: 'GJ', haryana: 'HR',
+  'himachal pradesh': 'HP', jharkhand: 'JH', karnataka: 'KA', kerala: 'KL',
+  'madhya pradesh': 'MP', maharashtra: 'MH', manipur: 'MN', meghalaya: 'ML',
+  mizoram: 'MZ', nagaland: 'NL', odisha: 'OR', orissa: 'OR', punjab: 'PB',
+  rajasthan: 'RJ', sikkim: 'SK', 'tamil nadu': 'TN', telangana: 'TG', tripura: 'TR',
+  uttarakhand: 'UK', 'uttar pradesh': 'UP', 'west bengal': 'WB',
 };
 
 type CsvRow = Record<string, string>;
@@ -334,11 +348,27 @@ export function comparisonWeightSnapshotForSelection(
   return {
     weights: forecastWeights,
     context: `${location?.label ?? locationId} · ${variableInfo(variable).label} · ${periodLabel(data, period)} · ${lead}h`,
+    locationId,
+    locationName: location?.city ?? locationId,
+    stateCode: location?.state ?? '',
+    variable,
+    period,
+    lead,
   };
 }
 
-export function defaultComparisonWeightSnapshot(data: MockWeatherData): ComparisonWeightSnapshot | null {
-  const location = data.locations.find((item) => item.city.toLowerCase() === 'mumbai') ?? data.locations[0];
+export function comparisonWeightSnapshotForDistrict(
+  data: MockWeatherData,
+  districtName: string,
+  stateName: string,
+  variable: VariableKey,
+  lead: number,
+  period: Period,
+): ComparisonWeightSnapshot | null {
+  const stateCode = STATE_CODES[stateName.trim().toLowerCase()];
+  if (!stateCode) return null;
+  const normalizedDistrict = districtName.trim().toLowerCase();
+  const location = data.locations.find((item) => item.city.trim().toLowerCase() === normalizedDistrict && item.state === stateCode);
   if (!location) return null;
-  return comparisonWeightSnapshotForSelection(data, location.id, 'rainfall_mm', 24, data.dates, 'last30');
+  return comparisonWeightSnapshotForSelection(data, location.id, variable, lead, datesForPeriod(data, period), period);
 }

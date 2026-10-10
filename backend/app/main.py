@@ -64,10 +64,21 @@ class Location(BaseModel):
     longitude: float | None = None
 
 
+class ComparisonWeightScope(BaseModel):
+    location_id: str
+    location_name: str
+    state_code: str
+    variable: Literal["rainfall_mm", "temperature_c", "wind_speed_kmh"]
+    evaluation_period: str
+    lead_hours: Literal[24, 48, 72]
+
+
 class ForecastRequest(BaseModel):
     location_id: str
     lead_hours: Literal[24, 48, 72] = 24
     weights: dict[str, float] | None = None
+    weight_context: str | None = None
+    comparison_scope: ComparisonWeightScope | None = None
 
 
 class ForecastSource(BaseModel):
@@ -98,6 +109,8 @@ class ForecastResponse(BaseModel):
     fetched_at: datetime
     sources: list[ForecastSource]
     weights: dict[str, float]
+    comparison_weights: dict[str, float]
+    weight_context: str | None = None
     weight_method: str
     verification_reference: str
     blended: dict[str, float | None]
@@ -176,7 +189,7 @@ def all_locations() -> list[Location]:
 
 LOCATIONS = all_locations()
 LOCATION_MAP = {x.id: x for x in LOCATIONS}
-FORECAST_CACHE: dict[tuple[str, int, tuple[tuple[str, float], ...]], tuple[float, dict]] = {}
+FORECAST_CACHE: dict[tuple[str, int, tuple[tuple[str, float], ...], str | None], tuple[float, dict]] = {}
 
 
 def selectable_locations() -> tuple[list[Location], set[str]]:
@@ -290,12 +303,22 @@ async def fetch_model(client: httpx.AsyncClient, name: str, location: Location, 
 
 
 def weights_for(sources: list[dict], comparison_weights: dict[str, float] | None = None) -> tuple[dict, str]:
-    if comparison_weights:
-        return dict(comparison_weights), "model_comparison_weights"
-    # No verified history has been configured; equal weights are explicitly labelled a demo fallback.
     available = [s["model"] for s in sources if s["status"] == "available"]
-    if not available: return {}, "unavailable"
-    return {name: 1 / len(available) for name in available}, "equal_fallback_no_verified_history"
+    if not available:
+        return {}, "unavailable"
+    if comparison_weights:
+        available_total = sum(comparison_weights.get(name, 0.0) for name in available)
+        if available_total > 0:
+            names = set(MODELS) | set(comparison_weights) | {s["model"] for s in sources}
+            used = {name: comparison_weights.get(name, 0.0) / available_total if name in available else 0.0 for name in names}
+            unavailable_had_weight = any(comparison_weights.get(s["model"], 0.0) > 0 for s in sources if s["status"] != "available")
+            missing_available_weight = any(name not in comparison_weights for name in available)
+            method = "model_comparison_weights_adjusted_available_sources" if unavailable_had_weight or missing_available_weight else "model_comparison_weights"
+            return used, method
+    # Use equal weights only when there are no positive matching weights on available sources.
+    method = "equal_fallback_no_matching_available_comparison_weights" if comparison_weights else "equal_fallback_no_matching_comparison_weights"
+    names = set(MODELS) | {s["model"] for s in sources}
+    return {name: 1 / len(available) if name in available else 0.0 for name in names}, method
 
 
 def blend(sources: list[dict], weights: dict) -> dict:
@@ -307,7 +330,8 @@ def blend(sources: list[dict], weights: dict) -> dict:
     # Circular mean prevents the 359°/1° wraparound error.
     dirs = [(math.radians(s["wind_direction_deg"]), weights.get(s["model"], 0)) for s in sources if s["status"] == "available" and s.get("wind_direction_deg") is not None]
     x = sum(math.cos(a) * w for a, w in dirs); y = sum(math.sin(a) * w for a, w in dirs)
-    out["wind_direction_deg"] = (math.degrees(math.atan2(y, x)) % 360) if dirs else None
+    direction_weight = sum(w for _, w in dirs)
+    out["wind_direction_deg"] = (math.degrees(math.atan2(y, x)) % 360) if direction_weight else None
     return out
 
 
@@ -328,18 +352,26 @@ def make_risks(values: dict, location: Location):
     return [{"type": kind, "level": risk(v, metric), "message": labels[risk(v, metric)], "value": v, "unit": unit, "location": location.name, "prototype_guidance": True} for kind, metric, v, unit in cases]
 
 
-async def forecast(location: Location, hours: int, comparison_weights: dict[str, float] | None = None):
+async def forecast(location: Location, hours: int, comparison_weights: dict[str, float] | None = None, weight_context: str | None = None):
     weight_key = tuple(sorted((comparison_weights or {}).items()))
-    key = (location.id, hours, weight_key); cached = FORECAST_CACHE.get(key)
+    key = (location.id, hours, weight_key, weight_context); cached = FORECAST_CACHE.get(key)
     if cached and cached[0] > time.monotonic(): return cached[1]
     async with httpx.AsyncClient() as client:
         sources = await asyncio.gather(*(fetch_model(client, name, location, hours) for name in MODELS))
     weights, method = weights_for(sources, comparison_weights); values = blend(sources, weights)
+    if method == "model_comparison_weights":
+        explanation = f"Forecast values are blended using the matching Model Comparison weights{f' for {weight_context}' if weight_context else ''}."
+    elif method == "model_comparison_weights_adjusted_available_sources":
+        explanation = f"Matching Model Comparison weights{f' for {weight_context}' if weight_context else ''} were renormalized over available forecast sources; unavailable sources receive 0% weight."
+    elif method.startswith("equal_fallback"):
+        explanation = "No positive matching Model Comparison weights were available for the selected forecast sources. Equal weights were applied across available sources as an explicit fallback."
+    else:
+        explanation = "No forecast sources are available, so no blended values or contribution weights could be calculated."
     result = {"location": location, "lead_hours": hours, "fetched_at": datetime.now(timezone.utc).isoformat(), "sources": sources,
-            "weights": weights, "weight_method": method, "verification_reference": "none_configured", "blended": values,
+            "weights": weights, "comparison_weights": comparison_weights or {}, "weight_context": weight_context,
+            "weight_method": method, "verification_reference": "none_configured", "blended": values,
             "risks": make_risks(values, location), "partial": any(s["status"] != "available" for s in sources),
-            "explanation": "Using the current Model Comparison weights. Forecast values are still retrieved from live providers." if comparison_weights else
-            "Equal weights are a transparent fallback because this MVP has no stored verification history. No live provider value is replaced with a synthetic forecast."}
+            "explanation": explanation}
     if database.configured:
         try:
             await database.save_forecast(result)
@@ -359,7 +391,15 @@ async def forecast_endpoint(request: ForecastRequest):
         total_weight = sum(request.weights.values())
         if any(not math.isfinite(weight) or weight < 0 for weight in request.weights.values()) or not math.isfinite(total_weight) or total_weight <= 0:
             raise HTTPException(422, "Weights must be finite, non-negative, and include a positive value")
-    return await forecast(location, request.lead_hours, request.weights)
+    if request.comparison_scope:
+        scope = request.comparison_scope
+        if request.weights is None:
+            raise HTTPException(422, "Comparison scope requires comparison weights")
+        if scope.lead_hours != request.lead_hours:
+            raise HTTPException(422, "Comparison weights must match the requested forecast lead")
+        if scope.location_name.casefold() != location.name.casefold():
+            raise HTTPException(422, "Comparison weights must match the requested forecast location")
+    return await forecast(location, request.lead_hours, request.weights, request.weight_context)
 
 
 @app.post("/api/map/state/{state_id}")

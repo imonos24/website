@@ -13,24 +13,67 @@ class BlendTests(unittest.TestCase):
             {"model": "B", "status": "unavailable"},
             {"model": "C", "status": "available"},
         ])
-        self.assertEqual(method, "equal_fallback_no_verified_history")
+        self.assertEqual(method, "equal_fallback_no_matching_comparison_weights")
         self.assertAlmostEqual(sum(weights.values()), 1.0)
-        self.assertNotIn("B", weights)
+        self.assertEqual(weights["B"], 0.0)
 
-    def test_comparison_weights_override_the_equal_fallback(self):
+    def test_comparison_weights_are_adjusted_for_unavailable_sources(self):
         comparison_weights = {"A": 0.194478, "B": 0.224242, "C": 0.356236, "D": 0.225044}
         weights, method = weights_for(
             [{"model": "A", "status": "available"}, {"model": "B", "status": "unavailable"}],
             comparison_weights,
         )
-        self.assertEqual(method, "model_comparison_weights")
-        self.assertEqual(weights, comparison_weights)
+        self.assertEqual(method, "model_comparison_weights_adjusted_available_sources")
+        self.assertEqual(weights["A"], 1.0)
+        self.assertEqual(weights["B"], 0.0)
         self.assertAlmostEqual(sum(weights.values()), 1.0)
         values = blend([
             {"model": "A", "status": "available", "rainfall_mm": 10, "temperature_c": None, "wind_speed_kmh": None},
             {"model": "B", "status": "available", "rainfall_mm": 20, "temperature_c": None, "wind_speed_kmh": None},
         ], {"A": 0.2, "B": 0.8})
         self.assertEqual(values["rainfall_mm"], 18)
+
+    def test_comparison_weights_are_unchanged_when_all_sources_are_available(self):
+        comparison_weights = {"A": 0.20525, "B": 0.225463, "C": 0.388764, "D": 0.180523}
+        sources = [{"model": name, "status": "available"} for name in comparison_weights]
+        weights, method = weights_for(sources, comparison_weights)
+        self.assertEqual(method, "model_comparison_weights")
+        for name, weight in comparison_weights.items():
+            self.assertEqual(weights[name], weight)
+
+    def test_bishnupur_rainfall_comparison_weight_and_unavailable_adjustment(self):
+        comparison_weights = {
+            "NCEP GFS": 0.20525,
+            "ECMWF IFS HRES": 0.225463,
+            "ECMWF AIFS": 0.388764,
+            "GFS Ensemble Mean": 0.180523,
+        }
+        available_sources = [{"model": model, "status": "available"} for model in comparison_weights]
+        used, method = weights_for(available_sources, comparison_weights)
+        self.assertEqual(method, "model_comparison_weights")
+        self.assertAlmostEqual(used["NCEP GFS"] * 100, 20.525)
+        all_source_values = [
+            {"model": "NCEP GFS", "status": "available", "rainfall_mm": 10},
+            {"model": "ECMWF IFS HRES", "status": "available", "rainfall_mm": 20},
+            {"model": "ECMWF AIFS", "status": "available", "rainfall_mm": 30},
+            {"model": "GFS Ensemble Mean", "status": "available", "rainfall_mm": 40},
+        ]
+        self.assertAlmostEqual(blend(all_source_values, used)["rainfall_mm"], 25.4456)
+
+        partial_sources = [
+            {"model": "NCEP GFS", "status": "available", "rainfall_mm": 10},
+            {"model": "ECMWF IFS HRES", "status": "available", "rainfall_mm": 20},
+            {"model": "ECMWF AIFS", "status": "unavailable", "rainfall_mm": None},
+            {"model": "GFS Ensemble Mean", "status": "available", "rainfall_mm": 40},
+        ]
+        adjusted, method = weights_for(partial_sources, comparison_weights)
+        self.assertEqual(method, "model_comparison_weights_adjusted_available_sources")
+        self.assertEqual(adjusted["ECMWF AIFS"], 0.0)
+        self.assertAlmostEqual(adjusted["NCEP GFS"] * 100, 33.581, places=2)
+        adjusted_value = blend(partial_sources, adjusted)["rainfall_mm"]
+        expected_value = sum(partial_sources[index]["rainfall_mm"] * adjusted[partial_sources[index]["model"]]
+                             for index in (0, 1, 3))
+        self.assertAlmostEqual(adjusted_value, expected_value)
 
     def test_wind_direction_uses_circular_mean(self):
         sources = [

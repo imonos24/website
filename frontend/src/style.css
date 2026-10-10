@@ -77,6 +77,8 @@ footer{color:#202a31;font-size:11px;font-weight:700;line-height:1.6;overflow-wra
 @media(max-width:900px){.brandlogo{width:clamp(145px,16vw,170px)}}
 @media(max-width:760px){.brandlogo{width:clamp(130px,32vw,155px)}}
 @media(max-width:430px){.brandlogo{width:clamp(120px,35vw,138px)}}
+.comparison-weight-notice{margin:-7px 0 14px;padding:9px 12px;border:1px solid #dce9ef;border-radius:6px;background:#f2f8fa;color:#456879;font-size:10px;line-height:1.5}.comparison-weight-notice.fallback{border-color:#f0dfad;background:#fff9e9;color:#75642d}
+@media(max-width:760px){.comparison-weight-notice{font-size:9px;padding:8px 10px}}
 .simulator-purpose{max-width:780px;margin-top:10px;padding:9px 12px;border:1px solid #f0dfad;border-left:3px solid #d5a51b;border-radius:6px;background:#fff9e9;color:#75642d;font-size:10px;line-height:1.55}.simulator-purpose b{color:#665214}
 @media(max-width:760px){.simulator-purpose{margin-top:9px;padding:8px 10px;font-size:9px;line-height:1.5}}
 .nav-custom-icon{display:inline-block;flex:0 0 auto;background-color:currentColor;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;-webkit-mask-size:contain;mask-size:contain}.india-icon{-webkit-mask-image:url('/india.svg');mask-image:url('/india.svg')}.benchmark-icon{-webkit-mask-image:url('/benchmark.svg');mask-image:url('/benchmark.svg')}

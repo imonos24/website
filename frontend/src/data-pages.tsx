@@ -15,8 +15,6 @@ import {
 } from 'recharts';
 import { Database } from 'lucide-react';
 import {
-  COMPARISON_WEIGHT_STORAGE_KEY,
-  comparisonWeightSnapshotForSelection,
   comparisonWeightsForSelection,
   datesForPeriod,
   displayModel,
@@ -416,16 +414,6 @@ export function DatabaseComparison() {
     ? seriesForSelection(data, locationId, variable, lead, dates) : [], [data, locationId, variable, lead, dates]);
   const metrics = useMemo(() => data && locationId
     ? metricsForSelection(data, locationId, variable, lead, period, dates) : [], [data, locationId, variable, lead, period, dates]);
-  const weightSnapshot = useMemo(() => data && locationId
-    ? comparisonWeightSnapshotForSelection(data, locationId, variable, lead, dates, period) : null,
-  [data, locationId, variable, lead, dates, period]);
-
-  useEffect(() => {
-    if (!data || !locationId) return;
-    if (weightSnapshot) localStorage.setItem(COMPARISON_WEIGHT_STORAGE_KEY, JSON.stringify(weightSnapshot));
-    else localStorage.removeItem(COMPARISON_WEIGHT_STORAGE_KEY);
-  }, [data, locationId, weightSnapshot]);
-
   if (!data) return <LoadingState error={error} />;
   if (noDataMessage(data, locationId, dates, lead)) {
     return <><FilterBar {...{ data, locationId, setLocationId, variable, setVariable, period, setPeriod, lead, setLead }} />
