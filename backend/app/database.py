@@ -28,35 +28,56 @@ class SupabaseDatabase:
         self.dsn = os.getenv("DATABASE_URL", "").strip()
         self.pooler_host = os.getenv("SUPABASE_POOLER_HOST", "").strip()
         self.configured = bool(self.dsn)
+        default_pool_mode = "transaction" if os.getenv("VERCEL") else "session"
+        self.pool_mode = os.getenv("SUPABASE_POOLER_MODE", default_pool_mode).strip().lower()
+        if self.pool_mode not in {"session", "transaction"}:
+            self.pool_mode = default_pool_mode
         self.pool: asyncpg.Pool | None = None
 
     async def open(self) -> None:
         if not self.configured or self.pool:
             return
         try:
+            serverless = bool(os.getenv("VERCEL"))
+            pool_size = 1 if serverless or self.pool_mode == "transaction" else 6
+            pool_options = {
+                "dsn": self._runtime_dsn(),
+                "min_size": 0 if serverless else 1,
+                "max_size": pool_size,
+                "timeout": 8,
+                "command_timeout": 20,
+                "ssl": "require",
+            }
+            if self.pool_mode == "transaction":
+                # Supavisor transaction mode does not support prepared statements.
+                pool_options["statement_cache_size"] = 0
             self.pool = await asyncpg.create_pool(
-                dsn=self._runtime_dsn(),
-                min_size=1,
-                max_size=6,
-                timeout=8,
-                command_timeout=20,
-                ssl="require",
+                **pool_options,
             )
         except Exception as exc:
             raise DatabaseError("Could not connect to the Supabase Postgres database") from exc
 
     def _runtime_dsn(self) -> str:
-        """Route direct IPv6 DSNs through the configured IPv4 session pooler."""
+        """Use the configured shared pooler, selecting its serverless mode on Vercel."""
         parts = urlsplit(self.dsn)
-        if not self.pooler_host or not (parts.hostname or "").startswith("db."):
+        database_host = parts.hostname or ""
+        is_direct_host = database_host.startswith("db.")
+        is_pooler_host = database_host.endswith(".pooler.supabase.com")
+        if not is_direct_host and not is_pooler_host:
             return self.dsn
-        project_ref = parts.hostname.split(".", 2)[1]
+
+        pooler_host = self.pooler_host or (database_host if is_pooler_host else "")
+        if not pooler_host:
+            return self.dsn
+
+        project_ref = database_host.split(".", 2)[1] if is_direct_host else ""
         userinfo = parts.netloc.rsplit("@", 1)[0]
         username_raw, separator, password_raw = userinfo.partition(":")
         username = unquote(username_raw)
-        if "." not in username:
+        if is_direct_host and "." not in username:
             username = f"{username}.{project_ref}"
-        netloc = f"{quote(username, safe='.')}{separator}{password_raw}@{self.pooler_host}:5432"
+        port = 6543 if self.pool_mode == "transaction" else 5432
+        netloc = f"{quote(username, safe='.')}{separator}{password_raw}@{pooler_host}:{port}"
         return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
     async def close(self) -> None:
