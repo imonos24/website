@@ -66,3 +66,9 @@
 
 footer{color:#202a31;font-size:11px;font-weight:700;line-height:1.6;overflow-wrap:anywhere}
 @media(max-width:760px){footer{font-size:10px}}
+
+/* Compact the branded header while keeping the logo at its natural ratio. */
+.top{min-height:96px;padding:8px 28px;gap:18px}.brandlogo{width:clamp(165px,14vw,205px)}.brand small{font-size:11px;line-height:1.25}.frame{min-height:calc(100vh - 96px)}
+@media(max-width:900px){.top{padding-left:18px;padding-right:18px;gap:12px}.brandlogo{width:clamp(165px,18vw,195px)}}
+@media(max-width:760px){.top{padding:7px 13px;gap:8px;row-gap:3px}.brandlogo{width:clamp(145px,36vw,175px)}.brand small{font-size:9px}.topmeta{font-size:8px}.frame{min-height:calc(100vh - 108px)}.side:not(.collapsed){top:108px}}
+@media(max-width:430px){.top{padding-left:10px;padding-right:10px}.brandlogo{width:clamp(135px,39vw,155px)}.brand small{font-size:8px}.topmeta{font-size:7px}}
