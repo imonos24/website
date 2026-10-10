@@ -36,13 +36,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await database.open()
     if database.configured:
         try:
+            await database.open()
             synced = await database.sync_locations(LOCATIONS)
             logger.info("Synced %s location records to Supabase", synced)
         except DatabaseError:
-            logger.exception("Could not initialize the Supabase location catalog")
+            logger.exception("Supabase is unavailable; continuing without database persistence")
     try:
         yield
     finally:
@@ -341,9 +341,8 @@ async def forecast(location: Location, hours: int, comparison_weights: dict[str,
     if database.configured:
         try:
             await database.save_forecast(result)
-        except DatabaseError as exc:
+        except DatabaseError:
             logger.exception("Could not persist forecast results to Supabase")
-            raise HTTPException(503, "Forecast data was retrieved, but saving it to Supabase failed. Check the backend log and database setup.") from exc
     FORECAST_CACHE[key] = (time.monotonic() + (120 if result["partial"] else 600), result)
     return result
 
