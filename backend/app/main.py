@@ -28,7 +28,7 @@ MODELS = {
     # ECMWF's dedicated endpoint defaults to the native 9 km HRES product.
     "ECMWF IFS HRES": ("https://api.open-meteo.com/v1/ecmwf", ""),
     "ECMWF AIFS": ("https://api.open-meteo.com/v1/forecast", "ecmwf_aifs025_single"),
-    "GFS Ensemble Mean": ("https://api.open-meteo.com/v1/forecast", "ncep_gefs025_ensemble_mean"),
+    "GFS Ensemble Mean": ("https://ensemble-api.open-meteo.com/v1/ensemble", "ncep_gefs025_ensemble_mean"),
 }
 
 logger = logging.getLogger(__name__)
@@ -277,6 +277,8 @@ async def fetch_model(client: httpx.AsyncClient, name: str, location: Location, 
         end = min(hours + 1, len(hourly.get("time", []))); start = max(1, end - 24)
         def vals(k): return [x for x in hourly.get(k, [])[start:end] if isinstance(x, (int, float))]
         rain, temps, winds, dirs = vals("precipitation"), vals("temperature_2m"), vals("wind_speed_10m"), vals("wind_direction_10m")
+        if not any((rain, temps, winds, dirs)):
+            raise ValueError("Model returned no hourly values for the requested forecast period")
         vectors = [(math.cos(math.radians(d)), math.sin(math.radians(d))) for d in dirs]
         direction = math.degrees(math.atan2(sum(y for _, y in vectors), sum(x for x, _ in vectors))) % 360 if vectors else None
         valid_times = hourly.get("time", [])
